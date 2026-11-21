@@ -240,7 +240,7 @@ class OpenSmsApp(MDApp):
             services = manager.getRunningServices(1000)
             for service_info in services.toArray():
                 if str(service_info.service.getClassName()) == (
-                    'in.daslearning.opensms.ServiceOpensmssvc'
+                    'com.greatfy.kelaplussms.ServiceOpensmssvc'
                 ):
                     return True
             return False
@@ -251,7 +251,7 @@ class OpenSmsApp(MDApp):
         if platform == "android":
             PythonActivity = autoclass('org.kivy.android.PythonActivity')
             mActivity = PythonActivity.mActivity
-            service = autoclass('in.daslearning.opensms.ServiceOpensmssvc')
+            service = autoclass('com.greatfy.kelaplussms.ServiceOpensmssvc')
             #argument = ''
             argument = os.environ.get('PYTHON_SERVICE_ARGUMENT', '')
             print(f"PYTHON_SERVICE_ARGUMENT: {argument}")
@@ -261,7 +261,7 @@ class OpenSmsApp(MDApp):
 
     def stop_service(self):
         if platform == "android":
-            service = autoclass('in.daslearning.opensms.ServiceOpensmssvc')
+            service = autoclass('com.greatfy.kelaplussms.ServiceOpensmssvc')
             PythonActivity = autoclass('org.kivy.android.PythonActivity')
             mActivity = PythonActivity.mActivity
             service.stop(mActivity)
