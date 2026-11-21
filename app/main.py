@@ -112,7 +112,7 @@ class OpenSmsApp(MDApp):
         self.config_template = {
             "app": app_name,
             "port": 9292,
-            "boot": False,
+            "boot": True,  # Kelaplus : le serveur démarre tout seul, pour que l'ordinateur trouve le téléphone sans toucher à « Start Server »
             "permissions": False,
         }
         self.req_template = {
@@ -213,6 +213,10 @@ class OpenSmsApp(MDApp):
                 auto_start_sw.active = False
         else:
             self.write_app_conf()
+            # Première ouverture : on démarre le serveur tout de suite (réglage « démarrer à l'ouverture » activé par défaut).
+            self.req_template["server"] = "start"
+            auto_start_sw.active = True
+            Thread(target=self.write_request, daemon=True).start()
         port_no_inp.text = str(self.config_template["port"])
         api_keys = get_api_keys()
         if len(api_keys) >= 1:
