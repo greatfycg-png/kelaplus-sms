@@ -10,18 +10,35 @@ permissions:
 jobs:
   apk:
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
 
-      - name: Compiler l'APK (buildozer)
-        id: build
-        uses: ArtemSBulgakov/buildozer-action@v1
+      - uses: actions/setup-python@v5
         with:
-          command: buildozer android debug
-          buildozer_version: stable
-          repository_root: .
-          working_directory: app
+          python-version: '3.11'
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Dépendances système
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git zip unzip autoconf automake libtool pkg-config \
+            zlib1g-dev libncurses-dev cmake libffi-dev libssl-dev build-essential ccache
+
+      - name: Buildozer
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install buildozer "cython<3" virtualenv
+
+      - name: Compiler l'APK
+        working-directory: app
+        env:
+          BUILDOZER_WARN_ON_ROOT: '0'
+        run: buildozer -v android debug
 
       - name: Publier l'APK
         uses: actions/upload-artifact@v4
