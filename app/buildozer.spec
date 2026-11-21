@@ -6,7 +6,7 @@
 [app]
 
 # (str) Title of your application
-title = OpenSMS
+title = Kelaplus SMS
 
 # (str) Package name
 package.name = opensms

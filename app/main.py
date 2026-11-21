@@ -40,6 +40,7 @@ from screens.settings import SettingsBox, ApiKeyTxtbox
 
 # import services
 from services.postApi import get_api_keys, generate_new_api_key
+from services import pairing
 from services.netSvc import get_network_ips
 from services.config import __version__, app_name
 
@@ -106,6 +107,8 @@ class OpenSmsApp(MDApp):
         self.api_key = None
         self.serial_started = False
         self.serial_dropdown_menu = None
+        self.pair_dialog = None  # fenêtre « Autoriser Kelaplus ? » (jumelage, voir services/pairing.py)
+        self.pair_id_vu = None  # dernière demande de connexion montrée (pour ne pas la rouvrir)
         self.config_template = {
             "app": app_name,
             "port": 9292,
@@ -217,6 +220,8 @@ class OpenSmsApp(MDApp):
         self.stop_resp_loop()
         self.resp_thred = Thread(target=self.resp_check_loop, daemon=True)
         self.resp_thred.start()
+        # Kelaplus : une demande de connexion de l'ordinateur s'affiche ici dès qu'elle arrive (l'application doit être ouverte).
+        Clock.schedule_interval(self.verifier_jumelage, 1)
         print("Init success...")
 
     def is_service_running(self):
@@ -543,6 +548,68 @@ class OpenSmsApp(MDApp):
             Clipboard.copy(self.api_key)
         self.txt_dialog_closer()
         Clock.schedule_once(lambda dt: self.show_toast_msg("API Key has been copied, store it securely."))
+
+    ## Connexion de Kelaplus (jumelage) : l'ordinateur demande, l'utilisateur autorise sur le téléphone
+
+    def verifier_jumelage(self, dt=None):
+        """ Toutes les secondes : y a-t-il une demande de connexion de Kelaplus à montrer ? """
+        if self.pair_dialog:
+            return
+        try:
+            demande = pairing.demande_en_attente()
+        except Exception as e:
+            print(f"Jumelage : lecture impossible : {e}")
+            return
+        if demande and demande["id"] != self.pair_id_vu:
+            self.pair_id_vu = demande["id"]
+            self.fenetre_jumelage(demande)
+
+    def fenetre_jumelage(self, demande):
+        poste = demande.get("poste", "Ordinateur")
+        ecole = demande.get("ecole", "")
+        qui = f"« {poste} »" + (f" ({ecole})" if ecole else "")
+        buttons = MDDialogButtonContainer(
+            Widget(),
+            MDButton(
+                MDButtonText(text="Refuser"),
+                style="text",
+                on_release=lambda *_: self.repondre_jumelage(demande["id"], False)
+            ),
+            MDButton(
+                MDButtonText(text="Autoriser", theme_text_color="Custom", text_color="green"),
+                style="text",
+                on_release=lambda *_: self.repondre_jumelage(demande["id"], True)
+            ),
+            spacing="8dp",
+        )
+        self.pair_dialog = MDDialog(
+            MDDialogHeadlineText(text="Autoriser Kelaplus ?"),
+            MDDialogSupportingText(
+                text=(
+                    f"L'ordinateur {qui} demande à se connecter à ce téléphone pour envoyer des SMS (paiements, absences, rappels...). "
+                    "N'autorisez que si c'est bien vous qui venez de cliquer sur « Connexion » dans Kelaplus."
+                )
+            ),
+            buttons,
+            auto_dismiss=False,
+        )
+        self.pair_dialog.open()
+
+    def repondre_jumelage(self, id_demande, accepte):
+        if self.pair_dialog:
+            self.pair_dialog.dismiss()
+            self.pair_dialog = None
+        try:
+            if accepte:
+                ok = pairing.accepter(id_demande)
+                message = "Kelaplus est connecté : il enverra ses SMS par ce téléphone." if ok else "La demande a expiré : recommencez depuis Kelaplus."
+                Clock.schedule_once(lambda dt: self.show_toast_msg(message, is_error=not ok))
+            else:
+                pairing.refuser(id_demande)
+                Clock.schedule_once(lambda dt: self.show_toast_msg("Connexion refusée."))
+        except Exception as e:
+            print(f"Jumelage : réponse impossible : {e}")
+            Clock.schedule_once(lambda dt: self.show_toast_msg("Impossible d'enregistrer la réponse, réessayez.", is_error=True))
 
     def api_doc_link(self, instance=None):
         port_no = self.config_template["port"]

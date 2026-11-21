@@ -16,7 +16,8 @@ import uvicorn
 from services.pathMgr import get_os_platform
 from services.smsApi import SmsCrossPlatform, clean_and_validate_phone
 from services.logSvc import LogService
-from services.config import app_name
+from services.config import app_name, __version__ as app_version
+from services import pairing
 
 # OS specific
 #try:
@@ -279,6 +280,38 @@ async def process_sms_req(
         ).start()
 
     return {"stat": stat}
+
+# --- Jumelage avec Kelaplus (voir services/pairing.py) -----------------------------------------------------------------------
+
+class PairData(BaseModel):
+    poste: str = "Ordinateur"
+    ecole: str = ""
+
+@app.get("/kelaplus/ping")
+async def kelaplus_ping():
+    """ Sans clé : permet à Kelaplus de trouver ce téléphone sur le réseau. Ne révèle que le nom de l'appareil. """
+    return {
+        "service": "kelaplus-sms",
+        "version": app_version,
+        "appareil": pairing.nom_appareil(),
+        "ordinateurs": len(pairing.ordinateurs_connectes()),
+    }
+
+@app.post("/kelaplus/pair")
+async def kelaplus_pair(item: PairData, request: Request):
+    """ Kelaplus demande à se connecter : rien n'est accordé ici, l'utilisateur doit autoriser sur le téléphone. """
+    client_ip = request.client.host if request.client else "unknown"
+    demande = pairing.creer_demande(item.poste, item.ecole)
+    log_activities(f"Demande de connexion de Kelaplus ({item.poste}) depuis {client_ip}")
+    return {"id": demande["id"], "statut": demande["statut"], "delai": pairing.DUREE_DEMANDE_S}
+
+@app.get("/kelaplus/pair/{id_demande}")
+async def kelaplus_pair_etat(id_demande: str):
+    """ Kelaplus attend la réponse : « attente », « accepte » (avec la clé, une seule fois), « refuse » ou « expire ». """
+    etat = pairing.etat_demande(id_demande)
+    if etat.get("statut") == "accepte":
+        log_activities("Kelaplus connecté : la clé a été remise à l'ordinateur")
+    return etat
 
 @app.post("/control/")
 async def internal_control(item: ControlData, request: Request):

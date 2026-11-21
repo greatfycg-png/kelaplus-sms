@@ -1,0 +1,31 @@
+# Compile l'APK « Kelaplus SMS » (Android) : Actions ▸ « APK Kelaplus SMS » ▸ Run workflow, puis télécharger l'artefact.
+name: 'APK Kelaplus SMS'
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compiler l'APK (buildozer)
+        id: build
+        uses: ArtemSBulgakov/buildozer-action@v1
+        with:
+          command: buildozer android debug
+          buildozer_version: stable
+          repository_root: .
+          working_directory: app
+
+      - name: Publier l'APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kelaplus-SMS-apk
+          path: app/bin/*.apk
+          if-no-files-found: error
