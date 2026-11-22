@@ -142,7 +142,7 @@ Builder.load_string(f'''
                     text: "Ordinateurs Kelaplus connectés"
                 MDLabel:
                     id: ordinateurs_lbl
-                    text: "Aucun ordinateur connecté. Dans Kelaplus : Communication ▸ Passerelles SMS ▸ Rechercher mon téléphone."
+                    text: "Aucun ordinateur connecté. Dans Kelaplus : Communication › Passerelles SMS › Rechercher mon téléphone."
                     font_style: "Body"
                     role: "medium"
                     theme_text_color: "Custom"

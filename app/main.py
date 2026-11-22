@@ -362,7 +362,7 @@ class OpenSmsApp(MDApp):
             ids.ordinateurs_lbl.text = (
                 "\n".join(f"•  {p}" for p in postes)
                 if postes
-                else "Aucun ordinateur connecté. Dans Kelaplus : Communication ▸ Passerelles SMS ▸ Rechercher mon téléphone."
+                else "Aucun ordinateur connecté. Dans Kelaplus : Communication › Passerelles SMS › Rechercher mon téléphone."
             )
         except Exception as e:
             print(f"Accueil : rafraîchissement impossible : {e}")
@@ -509,7 +509,7 @@ class OpenSmsApp(MDApp):
         )
         self.show_text_dialog(
             "Permissions manquantes",
-            "Accordez les permissions SMS et Notifications dans les paramètres du téléphone (si Android les bloque : menu ⋮ ▸ « Autoriser les paramètres restreints »).",
+            "Accordez les permissions SMS et Notifications dans les paramètres du téléphone (si Android les bloque : menu ⋮ › « Autoriser les paramètres restreints »).",
             None,
             buttons
         )

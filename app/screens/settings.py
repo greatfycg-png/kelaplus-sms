@@ -44,14 +44,18 @@ Builder.load_string(f'''
                         theme_icon_color: "Custom"
                         icon_color: "{t.VIOLET}"
                     MDListItemHeadlineText:
-                        text: "Démarrer le serveur à l'ouverture"
+                        text: "Démarrage automatique"
                     MDListItemSupportingText:
-                        text: "Conseillé : Kelaplus trouve le téléphone tout seul"
+                        text: "Le serveur s'ouvre avec l'appli"
                     MDSwitch:
                         id: auto_start_sw
                         pos_hint: {{"center_y": 0.5}}
                         icon_active: "check"
                         icon_inactive: "close"
+                        theme_thumb_color: "Custom"
+                        thumb_color_active: "white"
+                        theme_track_color: "Custom"
+                        track_color_active: "{t.VIOLET}"
                         on_release: app.save_settings(self, "switch")
 
                 LigneReglage:
@@ -62,9 +66,7 @@ Builder.load_string(f'''
                     MDListItemHeadlineText:
                         text: "Port du serveur"
                     MDListItemSupportingText:
-                        text: "9292 par défaut (1025 à 65535)"
-                    MDListItemTertiaryText:
-                        text: "Redémarrez le serveur après un changement"
+                        text: "9292 par défaut"
                     MDTextField:
                         id: port_no_inp
                         mode: "outlined"
