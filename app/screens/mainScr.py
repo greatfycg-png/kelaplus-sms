@@ -6,7 +6,7 @@ from kivymd.uix.textfield import MDTextField
 
 from kivy.lang import Builder
 from kivy.core.clipboard import Clipboard
-from kivy.properties import StringProperty
+from kivy.properties import StringProperty, ColorProperty, BooleanProperty
 
 from screens import theme as t
 
@@ -77,6 +77,53 @@ Builder.load_string(f'''
         theme_text_color: "Custom"
         text_color: "white"
 
+<LigneSolde>:
+    adaptive_height: True
+    padding: dp(12), dp(10)
+    spacing: dp(8)
+    radius: [dp(14)]
+    md_bg_color: "{t.FOND}"
+    MDBoxLayout:
+        orientation: "vertical"
+        adaptive_height: True
+        spacing: dp(2)
+        MDLabel:
+            text: root.operateur
+            font_style: "Title"
+            role: "small"
+            bold: True
+            theme_text_color: "Custom"
+            text_color: "{t.TEXTE}"
+            adaptive_height: True
+        MDLabel:
+            text: root.valeur
+            font_style: "Headline"
+            role: "small"
+            bold: True
+            theme_text_color: "Custom"
+            text_color: root.couleur
+            adaptive_height: True
+        MDLabel:
+            text: root.detail
+            font_style: "Label"
+            role: "medium"
+            theme_text_color: "Custom"
+            text_color: "{t.GRIS}"
+            adaptive_height: True
+    MDButton:
+        style: "outlined"
+        pos_hint: {{"center_y": .5}}
+        disabled: root.en_cours
+        on_release: app.consulter_solde(root.operateur)
+        MDButtonIcon:
+            icon: "refresh"
+            theme_icon_color: "Custom"
+            icon_color: "{t.VIOLET}"
+        MDButtonText:
+            text: "Patientez…" if root.en_cours else "Consulter"
+            theme_text_color: "Custom"
+            text_color: "{t.VIOLET}"
+
 <AppHomeBox>:
     orientation: 'vertical'
 
@@ -135,6 +182,24 @@ Builder.load_string(f'''
                     valeur: "0"
                     libelle: "Échecs"
                     couleur: "{t.ROUGE}"
+
+            CarteKela:
+                TitreCarte:
+                    icon: "sim-outline"
+                    text: "Solde SMS des SIM"
+                MDBoxLayout:
+                    id: soldes_box
+                    orientation: "vertical"
+                    adaptive_height: True
+                    spacing: dp(8)
+                MDLabel:
+                    id: soldes_aide
+                    text: "Saisissez le code de solde de chaque opérateur dans Réglages › Solde SMS."
+                    font_style: "Body"
+                    role: "small"
+                    theme_text_color: "Custom"
+                    text_color: "{t.GRIS}"
+                    adaptive_height: True
 
             CarteKela:
                 TitreCarte:
@@ -215,6 +280,15 @@ Builder.load_string(f'''
 
 class AppHomeBox(MDBoxLayout):
     pass
+
+
+class LigneSolde(MDBoxLayout):
+    """ Une SIM sur l'accueil : opérateur, SMS restants (en rouge sous le seuil), d'où vient le chiffre, bouton « Consulter ». """
+    operateur = StringProperty("")
+    valeur = StringProperty("—")
+    detail = StringProperty("")
+    couleur = ColorProperty(t.VIOLET)
+    en_cours = BooleanProperty(False)
 
 
 class ButtonControl(MDButton):

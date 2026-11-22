@@ -35,7 +35,7 @@ from kivymd.uix.label import MDLabel
 from kivymd.uix.dialog import MDDialog, MDDialogHeadlineText, MDDialogSupportingText, MDDialogButtonContainer, MDDialogContentContainer
 
 # import screens (else pyinstaller may ignore it)
-from screens.mainScr import ButtonControl, EndPointUrl, DocButton, SerialCard
+from screens.mainScr import ButtonControl, EndPointUrl, DocButton, SerialCard, LigneSolde
 from screens.settings import SettingsBox, ApiKeyTxtbox
 from screens.historiqueScr import HistoriqueBox
 from screens import theme as t
@@ -45,6 +45,8 @@ from services.postApi import get_api_keys, generate_new_api_key
 from services import pairing
 from services import historique
 from services import simRouting
+from services import soldeSms
+import time
 from services.netSvc import get_network_ips
 from services.config import __version__, app_name
 
@@ -156,7 +158,7 @@ class OpenSmsApp(MDApp):
                 print(f"Could not check the android SDK version: {e}")
                 #self.show_toast_msg(f"Error checking SDK: {e}", is_error=True)
             # Kelaplus : « Téléphone » (READ_PHONE_STATE) pour connaître les SIM d'un téléphone double SIM (choix de la SIM par opérateur).
-            self.android_permissions = [Permission.WAKE_LOCK, Permission.SEND_SMS, Permission.READ_PHONE_STATE]
+            self.android_permissions = [Permission.WAKE_LOCK, Permission.SEND_SMS, Permission.READ_PHONE_STATE, Permission.CALL_PHONE]
             if sdk_version >= 33:
                 self.android_permissions.extend([Permission.POST_NOTIFICATIONS])
             request_permissions(self.android_permissions)
@@ -238,6 +240,11 @@ class OpenSmsApp(MDApp):
         Clock.schedule_interval(self.verifier_jumelage, 1)
         # Accueil : chiffres du jour et ordinateurs connectés, tenus à jour.
         Clock.schedule_interval(self.rafraichir_accueil, 3)
+        # Solde SMS : vérification automatique (réglable) pendant que l'application est ouverte.
+        self.lignes_solde = {}
+        self.solde_en_cours = None
+        Clock.schedule_interval(self.verifier_soldes_auto, 600)
+        Clock.schedule_once(self.verifier_soldes_auto, 20)
         Clock.schedule_once(self.rafraichir_accueil, 1)
         print("Init success...")
 
@@ -360,6 +367,7 @@ class OpenSmsApp(MDApp):
             ids.chiffre_jour.valeur = str(r["aujourdhui"])
             ids.chiffre_envoyes.valeur = str(r["envoyes"])
             ids.chiffre_echecs.valeur = str(r["echecs"])
+            self.afficher_soldes()
             postes = pairing.ordinateurs_connectes()
             ids.ordinateurs_lbl.text = (
                 "\n".join(f"•  {p}" for p in postes)
@@ -452,7 +460,7 @@ class OpenSmsApp(MDApp):
             permission_flag = True
             for permission in self.android_permissions:
                 # « Téléphone » sert seulement au choix de la SIM : refusée, les SMS partent par la SIM par défaut, le serveur démarre quand même.
-                if permission == Permission.READ_PHONE_STATE:
+                if permission in (Permission.READ_PHONE_STATE, Permission.CALL_PHONE):
                     continue
                 tmp_flag = check_permission(permission)
                 if not tmp_flag:
@@ -841,6 +849,7 @@ class OpenSmsApp(MDApp):
         self.root.ids.top_back_btn.opacity = 1
         self.root.ids.top_back_btn.disabled = False
         self.charger_choix_sim()
+        self.charger_soldes_ui()
 
     ## Choix de la SIM selon l'opérateur du destinataire (services/simRouting.py)
 
@@ -864,6 +873,162 @@ class OpenSmsApp(MDApp):
                 ids.sims_lbl.text = "SIM détectées : aucune (autorisez « Téléphone » dans les permissions de l'application)" if platform == "android" else "SIM détectées : aucune (ordinateur)"
         except Exception as e:
             print(f"Choix de la SIM : affichage impossible : {e}")
+
+    ## Solde SMS des SIM (services/soldeSms.py ; Java : UssdHelper)
+
+    def afficher_soldes(self):
+        """ La carte « Solde SMS des SIM » de l'accueil : une ligne par opérateur réglé. """
+        ids = self.root.ids.home_scr.ids
+        r = soldeSms.lire()
+        envois = historique.envois(historique.MAX_ENVOIS)
+        noms = [o["operateur"] for o in r["operateurs"]]
+        if list(self.lignes_solde.keys()) != noms:
+            ids.soldes_box.clear_widgets()
+            self.lignes_solde = {}
+            for nom in noms:
+                ligne = LigneSolde(operateur=nom)
+                self.lignes_solde[nom] = ligne
+                ids.soldes_box.add_widget(ligne)
+        sans_code = [o["operateur"] for o in r["operateurs"] if not o.get("code")]
+        ids.soldes_aide.text = ("Code de solde à saisir dans Réglages › Solde SMS : " + ", ".join(sans_code) + ".") if sans_code else f"Alerte en rouge sous {r['seuil']} SMS."
+        for o in r["operateurs"]:
+            ligne = self.lignes_solde.get(o["operateur"])
+            if not ligne:
+                continue
+            e = soldeSms.etat(o, envois, r["seuil"])
+            ligne.en_cours = self.solde_en_cours == o["operateur"]
+            if e["restants"] is None:
+                ligne.valeur = "—"
+                ligne.couleur = t.GRIS
+                ligne.detail = (e["texte"][:90] + "…") if len(e["texte"] or "") > 90 else (e["texte"] or "Pas encore consulté.")
+            else:
+                ligne.valeur = f"{'≈ ' if e['estimation'] else ''}{e['restants']} SMS"
+                ligne.couleur = t.ROUGE if e["bas"] else t.VERT
+                quand = ""
+                if e["date"]:
+                    minutes = int((time.time() - e["date"]) / 60)
+                    quand = "à l'instant" if minutes < 1 else f"il y a {minutes} min" if minutes < 60 else f"il y a {minutes // 60} h" if minutes < 1440 else f"il y a {minutes // 1440} j"
+                source = "estimation d'après les SMS envoyés" if e["estimation"] else "réponse de l'opérateur"
+                ligne.detail = source + (f", {quand}" if quand else "") + ("  ·  solde bas : rechargez" if e["bas"] else "")
+
+    def consulter_solde(self, nom_operateur, silencieux=False):
+        """ Envoie le code de solde sur la SIM de cet opérateur et attend la réponse (30 secondes au plus). """
+        if self.solde_en_cours:
+            return
+        r = soldeSms.lire()
+        o = soldeSms.operateur(r, nom_operateur)
+        if not o or not o.get("code"):
+            if not silencieux:
+                self.show_toast_msg(f"Saisissez d'abord le code de solde {nom_operateur} dans Réglages › Solde SMS.", is_error=True)
+            return
+        sims = simRouting.sims_actives()
+        sim = next((x for x in sims if soldeSms._norm(nom_operateur) in soldeSms._norm(x.get("operateur", ""))), None)
+        if sims and not sim:
+            if not silencieux:
+                self.show_toast_msg(f"Aucune SIM {nom_operateur} détectée dans le téléphone.", is_error=True)
+            return
+        erreur = soldeSms.envoyer_ussd(sim["id"] if sim else None, o["code"])
+        if erreur:
+            if not silencieux:
+                self.show_toast_msg(erreur, is_error=True)
+            return
+        self.solde_en_cours = nom_operateur
+        self.afficher_soldes()
+        debut = time.time()
+
+        def attendre(dt):
+            etat, texte = soldeSms.reponse_ussd()
+            if etat == 0 and time.time() - debut < 30:
+                return True
+            ok = etat == 1
+            if etat == 0:
+                texte = "Pas de réponse de l'opérateur (30 s)."
+            dernier = soldeSms.enregistrer_reponse(nom_operateur, texte, ok)
+            self.solde_en_cours = None
+            self.afficher_soldes()
+            if not silencieux:
+                if ok and dernier.get("restants") is not None:
+                    self.show_toast_msg(f"{nom_operateur} : {dernier['restants']} SMS restants.")
+                else:
+                    self.show_toast_msg(f"{nom_operateur} : {texte[:120]}", is_error=not ok)
+            elif ok and dernier.get("restants") is not None and dernier["restants"] <= soldeSms.lire()["seuil"]:
+                self.show_toast_msg(f"Solde SMS bas sur la SIM {nom_operateur} : {dernier['restants']} SMS. Rechargez.", is_error=True)
+            return False
+
+        Clock.schedule_interval(attendre, 0.5)
+
+    def verifier_soldes_auto(self, dt=None):
+        """ Toutes les N heures (réglable), consulte le solde des opérateurs qui ont un code, l'un après l'autre. """
+        r = soldeSms.lire()
+        if not r.get("auto_heures") or platform != "android":
+            return
+        maintenant = time.time()
+        for o in r["operateurs"]:
+            dernier = (o.get("dernier") or {}).get("date") or 0
+            if o.get("code") and maintenant - dernier > r["auto_heures"] * 3600:
+                self.consulter_solde(o["operateur"], silencieux=True)
+                return  # un seul à la fois ; le suivant au prochain passage
+
+    def charger_soldes_ui(self):
+        try:
+            ids = self.root.ids.settings_scr.ids
+            r = soldeSms.lire()
+            ops = r["operateurs"] + [{"operateur": "", "code": "", "forfait": 0}] * 2
+            for n, o in ((1, ops[0]), (2, ops[1])):
+                ids[f"sol_op{n}"].text = o["operateur"]
+                ids[f"sol_code{n}"].text = o.get("code", "")
+                ids[f"sol_forfait{n}"].text = str(o.get("forfait") or "") if o.get("forfait") else ""
+            ids.sol_seuil.text = str(r["seuil"])
+            ids.sol_auto.text = str(r["auto_heures"])
+        except Exception as e:
+            print(f"Solde SMS : affichage des réglages impossible : {e}")
+
+    def enregistrer_soldes(self, instance=None, afficher=True):
+        ids = self.root.ids.settings_scr.ids
+        ancien = soldeSms.lire()
+        operateurs = []
+        for n in (1, 2):
+            nom = ids[f"sol_op{n}"].text.strip()
+            if not nom:
+                continue
+            code = ids[f"sol_code{n}"].text.strip()
+            if code and not soldeSms.code_valide(code):
+                self.show_toast_msg(f"Code de solde invalide pour {nom} (exemple : *123#).", is_error=True)
+                return False
+            avant = soldeSms.operateur(ancien, nom) or {}
+            forfait = ids[f"sol_forfait{n}"].text.strip()
+            operateurs.append({
+                "operateur": nom[:30],
+                "code": code,
+                "forfait": int(forfait) if forfait.isdigit() else 0,
+                "depuis": avant.get("depuis", 0),
+                "dernier": avant.get("dernier"),
+            })
+        seuil = ids.sol_seuil.text.strip()
+        auto = ids.sol_auto.text.strip()
+        soldeSms.ecrire({
+            "seuil": int(seuil) if seuil.isdigit() else 50,
+            "auto_heures": int(auto) if auto.isdigit() else 6,
+            "operateurs": operateurs,
+        })
+        self.lignes_solde = {}
+        self.rafraichir_accueil()
+        if afficher:
+            self.show_toast_msg("Réglages du solde SMS enregistrés.")
+        return True
+
+    def recharge_sim(self, n):
+        ids = self.root.ids.settings_scr.ids
+        nom = ids[f"sol_op{n}"].text.strip()
+        forfait = ids[f"sol_forfait{n}"].text.strip()
+        if not nom or not forfait.isdigit() or int(forfait) <= 0:
+            self.show_toast_msg("Indiquez l'opérateur et le nombre de SMS du forfait acheté.", is_error=True)
+            return
+        if not self.enregistrer_soldes(afficher=False):
+            return
+        soldeSms.recharge(nom, int(forfait))
+        self.rafraichir_accueil()
+        self.show_toast_msg(f"Recharge {nom} notée : {forfait} SMS à partir d'aujourd'hui.")
 
     def enregistrer_sim(self, instance=None):
         ids = self.root.ids.settings_scr.ids

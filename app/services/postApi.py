@@ -20,6 +20,7 @@ from services.config import app_name, __version__ as app_version
 from services import pairing
 from services import historique
 from services import simRouting
+from services import soldeSms
 
 # OS specific
 #try:
@@ -300,6 +301,13 @@ class PairData(BaseModel):
     poste: str = "Ordinateur"
     ecole: str = ""
 
+def _soldes_sans_erreur() -> list:
+    try:
+        return soldeSms.resume_pour_kelaplus(historique.envois(historique.MAX_ENVOIS))
+    except Exception as e:
+        print(f"Solde SMS illisible : {e}")
+        return []
+
 @app.get("/kelaplus/ping")
 async def kelaplus_ping():
     """ Sans clé : permet à Kelaplus de trouver ce téléphone sur le réseau. Ne révèle que le nom de l'appareil. """
@@ -308,6 +316,8 @@ async def kelaplus_ping():
         "version": app_version,
         "appareil": pairing.nom_appareil(),
         "ordinateurs": len(pairing.ordinateurs_connectes()),
+        # Solde de SMS de chaque SIM (opérateur ou estimation) : Kelaplus l'affiche à côté du téléphone.
+        "soldes": _soldes_sans_erreur(),
     }
 
 @app.post("/kelaplus/pair")

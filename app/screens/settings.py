@@ -155,6 +155,114 @@ Builder.load_string(f'''
 
             CarteKela:
                 TitreCarte:
+                    icon: "counter"
+                    text: "Solde SMS"
+                MDLabel:
+                    text: "Code de solde : le code que vous tapez pour voir vos SMS restants (exemple *123#). Forfait : le nombre de SMS achetés ; « Rechargé » démarre le décompte à partir d'aujourd'hui."
+                    font_style: "Body"
+                    role: "small"
+                    theme_text_color: "Custom"
+                    text_color: "{t.GRIS}"
+                    adaptive_height: True
+                MDBoxLayout:
+                    adaptive_height: True
+                    spacing: dp(6)
+                    MDTextField:
+                        id: sol_op1
+                        mode: "outlined"
+                        size_hint_x: .3
+                        MDTextFieldHintText:
+                            text: "Opérateur"
+                    MDTextField:
+                        id: sol_code1
+                        mode: "outlined"
+                        size_hint_x: .35
+                        MDTextFieldHintText:
+                            text: "Code de solde"
+                    MDTextField:
+                        id: sol_forfait1
+                        mode: "outlined"
+                        input_filter: "int"
+                        size_hint_x: .35
+                        MDTextFieldHintText:
+                            text: "Forfait (SMS)"
+                MDButton:
+                    style: "text"
+                    pos_hint: {{"right": 1}}
+                    on_release: app.recharge_sim(1)
+                    MDButtonIcon:
+                        icon: "battery-charging-high"
+                        theme_icon_color: "Custom"
+                        icon_color: "{t.VIOLET}"
+                    MDButtonText:
+                        text: "Rechargé aujourd'hui"
+                        theme_text_color: "Custom"
+                        text_color: "{t.VIOLET}"
+                MDBoxLayout:
+                    adaptive_height: True
+                    spacing: dp(6)
+                    MDTextField:
+                        id: sol_op2
+                        mode: "outlined"
+                        size_hint_x: .3
+                        MDTextFieldHintText:
+                            text: "Opérateur"
+                    MDTextField:
+                        id: sol_code2
+                        mode: "outlined"
+                        size_hint_x: .35
+                        MDTextFieldHintText:
+                            text: "Code de solde"
+                    MDTextField:
+                        id: sol_forfait2
+                        mode: "outlined"
+                        input_filter: "int"
+                        size_hint_x: .35
+                        MDTextFieldHintText:
+                            text: "Forfait (SMS)"
+                MDButton:
+                    style: "text"
+                    pos_hint: {{"right": 1}}
+                    on_release: app.recharge_sim(2)
+                    MDButtonIcon:
+                        icon: "battery-charging-high"
+                        theme_icon_color: "Custom"
+                        icon_color: "{t.VIOLET}"
+                    MDButtonText:
+                        text: "Rechargé aujourd'hui"
+                        theme_text_color: "Custom"
+                        text_color: "{t.VIOLET}"
+                MDBoxLayout:
+                    adaptive_height: True
+                    spacing: dp(6)
+                    MDTextField:
+                        id: sol_seuil
+                        mode: "outlined"
+                        input_filter: "int"
+                        MDTextFieldHintText:
+                            text: "Alerte sous (SMS)"
+                    MDTextField:
+                        id: sol_auto
+                        mode: "outlined"
+                        input_filter: "int"
+                        MDTextFieldHintText:
+                            text: "Vérifier toutes les (heures)"
+                MDButton:
+                    theme_bg_color: "Custom"
+                    md_bg_color: "{t.VIOLET}"
+                    pos_hint: {{"center_x": .5}}
+                    on_release: app.enregistrer_soldes()
+                    MDButtonIcon:
+                        icon: "content-save-outline"
+                        theme_icon_color: "Custom"
+                        icon_color: "white"
+                    MDButtonText:
+                        text: "Enregistrer le solde SMS"
+                        theme_text_color: "Custom"
+                        text_color: "white"
+
+            CarteKela:
+                TitreCarte:
                     icon: "key-outline"
                     text: "Clé API"
                 MDLabel:
