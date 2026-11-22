@@ -46,6 +46,7 @@ from services import pairing
 from services import historique
 from services import simRouting
 from services import soldeSms
+from services import miseAJour
 import time
 from services.netSvc import get_network_ips
 from services.config import __version__, app_name
@@ -245,6 +246,11 @@ class OpenSmsApp(MDApp):
         self.solde_en_cours = None
         Clock.schedule_interval(self.verifier_soldes_auto, 600)
         Clock.schedule_once(self.verifier_soldes_auto, 20)
+        # Mise à jour de l'application : vérifiée à l'ouverture puis toutes les 12 heures (internet nécessaire).
+        self.maj_proposee = None
+        self.root.ids.drawer_version.text = f"Version installée : {__version__}"
+        Clock.schedule_once(lambda dt: self.verifier_mise_a_jour(), 15)
+        Clock.schedule_interval(lambda dt: self.verifier_mise_a_jour(), 12 * 3600)
         Clock.schedule_once(self.rafraichir_accueil, 1)
         print("Init success...")
 
@@ -442,18 +448,16 @@ class OpenSmsApp(MDApp):
         permissions_ok = self.check_request_android_permission()
         if not permissions_ok:
             return
-        key_ok = self.check_if_key_exists()
-        if key_ok:
-            if not self.service_stat:
-                self.start_service()
-            if not self.api_started:
-                self.req_template["server"] = "start"
-                self.write_request()
-            else:
-                self.req_template["server"] = "stop"
-                self.write_request()
+        # Kelaplus : le serveur démarre même sans clé API. Chaque ordinateur Kelaplus reçoit sa propre clé quand on l'autorise
+        # (connexion par autorisation) ; la clé manuelle n'est plus qu'une option avancée (menu ☰ › Options avancées).
+        if not self.service_stat:
+            self.start_service()
+        if not self.api_started:
+            self.req_template["server"] = "start"
+            self.write_request()
         else:
-            self.new_api_key_pop()
+            self.req_template["server"] = "stop"
+            self.write_request()
 
     def check_request_android_permission(self):
         if platform == "android" and not self.config_template["permissions"]:
@@ -833,6 +837,83 @@ class OpenSmsApp(MDApp):
     def goto_app_settings(self, instance=None):
         self.txt_dialog_closer()
         self.go_to_screen("Réglages")
+
+    ## Mise à jour de l'application (services/miseAJour.py)
+
+    def verifier_mise_a_jour(self, manuel=False):
+        """ Demande la dernière version publiée ; plus récente : la propose (une fois par ouverture, sauf demande manuelle). """
+        if manuel:
+            self.root.ids.nav_drawer.set_state("close")
+            self.show_toast_msg("Recherche d'une mise à jour…")
+
+        def chercher():
+            derniere = miseAJour.derniere_version()
+            Clock.schedule_once(lambda dt: self.resultat_mise_a_jour(derniere, manuel))
+
+        Thread(target=chercher, daemon=True).start()
+
+    def resultat_mise_a_jour(self, derniere, manuel):
+        item = self.root.ids.drawer_maj_texte
+        if not derniere:
+            if manuel:
+                self.show_toast_msg("Impossible de vérifier : le téléphone est-il connecté à internet ?", is_error=True)
+            return
+        if not miseAJour.plus_recente(derniere["version"], __version__):
+            item.text = "Rechercher une mise à jour"
+            if manuel:
+                self.show_toast_msg(f"Kelaplus SMS est à jour (version {__version__}).")
+            return
+        item.text = f"Mettre à jour (version {derniere['version']})"
+        if self.maj_proposee == derniere["version"] and not manuel:
+            return
+        self.maj_proposee = derniere["version"]
+        buttons = MDDialogButtonContainer(
+            Widget(),
+            MDButton(MDButtonText(text="Plus tard"), style="text", on_release=self.txt_dialog_closer),
+            MDButton(
+                MDButtonText(text="Mettre à jour", theme_text_color="Custom", text_color=t.VIOLET),
+                style="text",
+                on_release=self.telecharger_mise_a_jour,
+            ),
+            spacing="8dp",
+        )
+        self.show_text_dialog(
+            f"Nouvelle version {derniere['version']} disponible",
+            f"Vous avez la version {__version__}. « Mettre à jour » télécharge le fichier KelaplusSMS.apk : ouvrez-le à la fin du téléchargement "
+            "et appuyez sur « Mettre à jour ». Vos réglages, l'historique des SMS et la connexion avec Kelaplus sont conservés.",
+            None,
+            buttons,
+        )
+
+    def telecharger_mise_a_jour(self, instance=None):
+        self.txt_dialog_closer()
+        self.open_link(instance, miseAJour.LIEN_APK)
+        self.show_toast_msg("Téléchargement lancé : ouvrez KelaplusSMS.apk à la fin pour installer la mise à jour.")
+
+    def options_avancees(self, instance=None):
+        """ Menu ☰ › Options avancées : réservé au technicien. La clé API manuelle ne sert pas avec Kelaplus. """
+        self.root.ids.nav_drawer.set_state("close")
+        buttons = MDDialogButtonContainer(
+            Widget(),
+            MDButton(MDButtonText(text="Fermer"), style="text", on_release=self.txt_dialog_closer),
+            MDButton(
+                MDButtonText(text="Clé API manuelle…", theme_text_color="Custom", text_color=t.ORANGE),
+                style="text",
+                on_release=self.cle_api_depuis_avance,
+            ),
+            spacing="8dp",
+        )
+        self.show_text_dialog(
+            "Options avancées",
+            "Réservé au technicien. Avec Kelaplus, aucune clé n'est à créer : chaque ordinateur reçoit la sienne quand vous l'autorisez. "
+            "Une nouvelle clé API manuelle déconnecte TOUS les ordinateurs Kelaplus ; il faudra les reconnecter un par un.",
+            None,
+            buttons,
+        )
+
+    def cle_api_depuis_avance(self, instance=None):
+        self.txt_dialog_closer()
+        self.new_api_key_pop()
 
     def goto_logs_screen(self, instance=None):
         self.root.ids.nav_drawer.set_state("close")

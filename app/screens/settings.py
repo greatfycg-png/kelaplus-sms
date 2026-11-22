@@ -261,29 +261,6 @@ Builder.load_string(f'''
                         theme_text_color: "Custom"
                         text_color: "white"
 
-            CarteKela:
-                TitreCarte:
-                    icon: "key-outline"
-                    text: "Clé API"
-                MDLabel:
-                    text: "Inutile avec Kelaplus : la connexion par autorisation crée une clé pour chaque ordinateur. Générer une nouvelle clé déconnecte tous les ordinateurs."
-                    font_style: "Body"
-                    role: "small"
-                    theme_text_color: "Custom"
-                    text_color: "{t.GRIS}"
-                    adaptive_height: True
-                MDButton:
-                    style: "outlined"
-                    pos_hint: {{"center_x": .5}}
-                    on_release: app.new_api_key_pop()
-                    MDButtonIcon:
-                        icon: "autorenew"
-                        theme_icon_color: "Custom"
-                        icon_color: "{t.ORANGE}"
-                    MDButtonText:
-                        text: "Générer une nouvelle clé"
-                        theme_text_color: "Custom"
-                        text_color: "{t.ORANGE}"
 
     MDBoxLayout:
         orientation: "horizontal"

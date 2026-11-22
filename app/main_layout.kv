@@ -128,6 +128,16 @@ MDScreen:
                     MDNavigationDrawerMenu:
                         MDNavigationDrawerLabel:
                             text: "Kelaplus SMS"
+                        MDNavigationDrawerLabel:
+                            id: drawer_version
+                            text: "Version installée : —"
+                        MDNavigationDrawerItem:
+                            on_release: app.verifier_mise_a_jour(manuel=True)
+                            MDNavigationDrawerItemLeadingIcon:
+                                icon: "update"
+                            MDNavigationDrawerItemText:
+                                id: drawer_maj_texte
+                                text: "Rechercher une mise à jour"
                         MDNavigationDrawerItem:
                             on_release: app.goto_logs_screen()
                             MDNavigationDrawerItemLeadingIcon:
@@ -135,6 +145,12 @@ MDScreen:
                             MDNavigationDrawerItemText:
                                 text: "Journal technique"
                         MDNavigationDrawerDivider:
+                        MDNavigationDrawerItem:
+                            on_release: app.options_avancees()
+                            MDNavigationDrawerItemLeadingIcon:
+                                icon: "tools"
+                            MDNavigationDrawerItemText:
+                                text: "Options avancées"
 
             MDNavigationBar:
                 id: btm_nav_bar
