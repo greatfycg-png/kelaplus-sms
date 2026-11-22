@@ -62,13 +62,14 @@ class SmsCrossPlatform:
         if platform != "android":
             self.serial = serial
 
-    def send_sms(self, phone:str, msg:str) -> bool:
+    def send_sms(self, phone:str, msg:str, sub_id:int|None=None) -> bool:
         """
         Sends SMS from your default SIM as set in settings on Android. Uses USB modem on Desktop.
 
         Args:
             - phone (str) : The phone number starting with country code. Ex: +14155552671
             - msg (str) : The actual text message which needs to be sent.
+            - sub_id (int|None) : Kelaplus — la SIM d'envoi (double SIM, voir services/simRouting.py) ; None : la SIM par défaut.
 
         Returns:
             - bool: True if the execution is successful
@@ -77,7 +78,14 @@ class SmsCrossPlatform:
         if platform == "android":
             try:
                 SmsManager = autoclass('android.telephony.SmsManager')
-                sms_manager = SmsManager.getDefault()
+                if sub_id is not None:
+                    try:
+                        sms_manager = SmsManager.getSmsManagerForSubscriptionId(int(sub_id))
+                    except Exception as e:
+                        print(f"SIM {sub_id} indisponible, SIM par défaut : {e}")
+                        sms_manager = SmsManager.getDefault()
+                else:
+                    sms_manager = SmsManager.getDefault()
                 parts = sms_manager.divideMessage(msg)
                 if parts.size() > 1:
                     sms_manager.sendMultipartTextMessage(phone, None, parts, None, None)

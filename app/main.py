@@ -44,6 +44,7 @@ from screens import theme as t
 from services.postApi import get_api_keys, generate_new_api_key
 from services import pairing
 from services import historique
+from services import simRouting
 from services.netSvc import get_network_ips
 from services.config import __version__, app_name
 
@@ -154,7 +155,8 @@ class OpenSmsApp(MDApp):
             except Exception as e:
                 print(f"Could not check the android SDK version: {e}")
                 #self.show_toast_msg(f"Error checking SDK: {e}", is_error=True)
-            self.android_permissions = [Permission.WAKE_LOCK, Permission.SEND_SMS]
+            # Kelaplus : « Téléphone » (READ_PHONE_STATE) pour connaître les SIM d'un téléphone double SIM (choix de la SIM par opérateur).
+            self.android_permissions = [Permission.WAKE_LOCK, Permission.SEND_SMS, Permission.READ_PHONE_STATE]
             if sdk_version >= 33:
                 self.android_permissions.extend([Permission.POST_NOTIFICATIONS])
             request_permissions(self.android_permissions)
@@ -449,6 +451,9 @@ class OpenSmsApp(MDApp):
         if platform == "android" and not self.config_template["permissions"]:
             permission_flag = True
             for permission in self.android_permissions:
+                # « Téléphone » sert seulement au choix de la SIM : refusée, les SMS partent par la SIM par défaut, le serveur démarre quand même.
+                if permission == Permission.READ_PHONE_STATE:
+                    continue
                 tmp_flag = check_permission(permission)
                 if not tmp_flag:
                     permission_flag = False
@@ -835,6 +840,46 @@ class OpenSmsApp(MDApp):
     def on_settings_entry(self, instance=None):
         self.root.ids.top_back_btn.opacity = 1
         self.root.ids.top_back_btn.disabled = False
+        self.charger_choix_sim()
+
+    ## Choix de la SIM selon l'opérateur du destinataire (services/simRouting.py)
+
+    def charger_choix_sim(self):
+        """ Remplit la carte « Choix de la SIM » : interrupteur, SIM détectées, opérateurs et préfixes des deux règles. """
+        try:
+            ids = self.root.ids.settings_scr.ids
+            r = simRouting.lire_reglages()
+            ids.sim_actif.active = bool(r.get("actif"))
+            regles = (r.get("regles") or []) + [{"operateur": "", "prefixes": []}] * 2
+            ids.op1.text = regles[0]["operateur"]
+            ids.pref1.text = ", ".join(regles[0]["prefixes"])
+            ids.op2.text = regles[1]["operateur"]
+            ids.pref2.text = ", ".join(regles[1]["prefixes"])
+            sims = simRouting.sims_actives()
+            if sims:
+                ids.sims_lbl.text = "SIM détectées : " + "  ·  ".join(f"SIM {x['emplacement'] + 1} : {x['operateur'] or 'inconnu'}" for x in sims)
+                if len(sims) < 2:
+                    ids.sims_lbl.text += "  (une seule SIM : tous les SMS partent par elle)"
+            else:
+                ids.sims_lbl.text = "SIM détectées : aucune (autorisez « Téléphone » dans les permissions de l'application)" if platform == "android" else "SIM détectées : aucune (ordinateur)"
+        except Exception as e:
+            print(f"Choix de la SIM : affichage impossible : {e}")
+
+    def enregistrer_sim(self, instance=None):
+        ids = self.root.ids.settings_scr.ids
+        regles = []
+        for op, pref in ((ids.op1.text, ids.pref1.text), (ids.op2.text, ids.pref2.text)):
+            nom = op.strip()
+            prefixes = simRouting.normaliser_prefixes(pref)
+            if nom and prefixes:
+                regles.append({"operateur": nom[:30], "prefixes": prefixes})
+        try:
+            simRouting.ecrire_reglages({"actif": bool(ids.sim_actif.active), "regles": regles})
+            self.charger_choix_sim()
+            self.show_toast_msg("Choix des SIM enregistré.")
+        except Exception as e:
+            print(f"Choix de la SIM : enregistrement impossible : {e}")
+            self.show_toast_msg("Impossible d'enregistrer le choix des SIM.", is_error=True)
 
     def back_button_action(self, instance=None):
         if self.root.ids.screen_manager.current in ["Réglages", "Journal", "Historique"]:

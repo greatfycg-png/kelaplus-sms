@@ -45,7 +45,7 @@ def _ecrire(envois: list) -> None:
     os.replace(temporaire, fichier_historique)
 
 
-def ajouter(numero: str, message: str, envoye: bool, ordinateur: str = "") -> dict:
+def ajouter(numero: str, message: str, envoye: bool, ordinateur: str = "", sim: str = "") -> dict:
     """ Inscrit un envoi ; renvoie l'enregistrement. """
     envoi = {
         "id": uuid.uuid4().hex[:12],
@@ -54,6 +54,8 @@ def ajouter(numero: str, message: str, envoye: bool, ordinateur: str = "") -> di
         "message": str(message)[:1600],
         "envoye": bool(envoye),
         "ordinateur": str(ordinateur or "")[:60],
+        # SIM d'envoi choisie par le routage (opérateur), vide : la SIM par défaut.
+        "sim": str(sim or "")[:40],
     }
     envois = _lire()
     envois.append(envoi)

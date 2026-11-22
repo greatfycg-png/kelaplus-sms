@@ -19,6 +19,7 @@ from services.logSvc import LogService
 from services.config import app_name, __version__ as app_version
 from services import pairing
 from services import historique
+from services import simRouting
 
 # OS specific
 #try:
@@ -263,10 +264,16 @@ async def process_sms_req(
             detail="Invalid phone number",
         )
 
-    stat = sms_api.send_sms(valid_phone, item.text)
+    # Kelaplus : téléphone double SIM, la SIM de l'opérateur du destinataire (06 → MTN, 05/04 → Airtel ; services/simRouting.py).
+    sim = None
+    try:
+        sim = simRouting.choisir_sim(valid_phone, simRouting.sims_actives(), simRouting.lire_reglages())
+    except Exception as e:
+        print(f"SIM : choix impossible, SIM par défaut : {e}")
+    stat = sms_api.send_sms(valid_phone, item.text, sim["id"] if sim else None)
     # Kelaplus : chaque envoi est gardé dans l'historique du téléphone (onglet « Historique »).
     try:
-        historique.ajouter(valid_phone, item.text, bool(stat), (client or {}).get("name", ""))
+        historique.ajouter(valid_phone, item.text, bool(stat), (client or {}).get("name", ""), sim["operateur"] if sim else "")
     except Exception as e:
         print(f"Historique non enregistré : {e}")
     if stat:

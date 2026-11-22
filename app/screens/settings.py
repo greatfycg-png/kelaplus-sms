@@ -74,6 +74,87 @@ Builder.load_string(f'''
 
             CarteKela:
                 TitreCarte:
+                    icon: "sim-outline"
+                    text: "Choix de la SIM (double SIM)"
+                MDLabel:
+                    text: "Chaque SMS part par la SIM de l'opérateur du destinataire : préfixe du numéro sans le +242 (06 pour MTN, 05 et 04 pour Airtel). Sans SIM de cet opérateur : la SIM par défaut."
+                    font_style: "Body"
+                    role: "small"
+                    theme_text_color: "Custom"
+                    text_color: "{t.GRIS}"
+                    adaptive_height: True
+                LigneReglage:
+                    MDListItemLeadingIcon:
+                        icon: "swap-horizontal"
+                        theme_icon_color: "Custom"
+                        icon_color: "{t.VIOLET}"
+                    MDListItemHeadlineText:
+                        text: "SIM selon l'opérateur"
+                    MDListItemSupportingText:
+                        text: "Sinon : SIM par défaut"
+                    MDSwitch:
+                        id: sim_actif
+                        pos_hint: {{"center_y": 0.5}}
+                        icon_active: "check"
+                        icon_inactive: "close"
+                        theme_thumb_color: "Custom"
+                        thumb_color_active: "white"
+                        theme_track_color: "Custom"
+                        track_color_active: "{t.VIOLET}"
+                MDLabel:
+                    id: sims_lbl
+                    text: "SIM détectées : —"
+                    font_style: "Body"
+                    role: "medium"
+                    theme_text_color: "Custom"
+                    text_color: "{t.TEXTE}"
+                    adaptive_height: True
+                MDBoxLayout:
+                    adaptive_height: True
+                    spacing: dp(8)
+                    MDTextField:
+                        id: op1
+                        mode: "outlined"
+                        size_hint_x: .45
+                        MDTextFieldHintText:
+                            text: "Opérateur 1"
+                    MDTextField:
+                        id: pref1
+                        mode: "outlined"
+                        size_hint_x: .55
+                        MDTextFieldHintText:
+                            text: "Préfixes (ex. 06)"
+                MDBoxLayout:
+                    adaptive_height: True
+                    spacing: dp(8)
+                    MDTextField:
+                        id: op2
+                        mode: "outlined"
+                        size_hint_x: .45
+                        MDTextFieldHintText:
+                            text: "Opérateur 2"
+                    MDTextField:
+                        id: pref2
+                        mode: "outlined"
+                        size_hint_x: .55
+                        MDTextFieldHintText:
+                            text: "Préfixes (ex. 05, 04)"
+                MDButton:
+                    theme_bg_color: "Custom"
+                    md_bg_color: "{t.VIOLET}"
+                    pos_hint: {{"center_x": .5}}
+                    on_release: app.enregistrer_sim()
+                    MDButtonIcon:
+                        icon: "content-save-outline"
+                        theme_icon_color: "Custom"
+                        icon_color: "white"
+                    MDButtonText:
+                        text: "Enregistrer le choix des SIM"
+                        theme_text_color: "Custom"
+                        text_color: "white"
+
+            CarteKela:
+                TitreCarte:
                     icon: "key-outline"
                     text: "Clé API"
                 MDLabel:

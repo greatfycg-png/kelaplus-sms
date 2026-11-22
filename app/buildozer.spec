@@ -138,6 +138,7 @@ icon.adaptive_background.filename = %(source.dir)s/data/images/icon_bg.png
 android.permissions = android.permission.INTERNET,
     android.permission.ACCESS_NETWORK_STATE,
     android.permission.SEND_SMS,
+    android.permission.READ_PHONE_STATE,
     android.permission.WAKE_LOCK,
     android.permission.FOREGROUND_SERVICE,
     android.permission.FOREGROUND_SERVICE_SPECIAL_USE,

@@ -189,10 +189,11 @@ class HistoriqueBox(MDBoxLayout):
             if len(message) > 220:
                 message = message[:217] + "…"
             ordinateur = e.get("ordinateur") or ""
+            sim = e.get("sim") or ""
             liste.add_widget(LigneSms(
                 numero=str(e.get("numero", "")),
                 message=message,
-                details=quand(e.get("date", 0)) + (f"  ·  depuis {ordinateur}" if ordinateur else ""),
+                details=quand(e.get("date", 0)) + (f"  ·  SIM {sim}" if sim else "") + (f"  ·  depuis {ordinateur}" if ordinateur else ""),
                 statut="Envoyé" if ok else "Échec",
                 couleur=t.VERT if ok else t.ROUGE,
                 fond=t.VERT_PALE if ok else t.ROUGE_PALE,
