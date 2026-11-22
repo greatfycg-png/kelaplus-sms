@@ -37,10 +37,13 @@ from kivymd.uix.dialog import MDDialog, MDDialogHeadlineText, MDDialogSupporting
 # import screens (else pyinstaller may ignore it)
 from screens.mainScr import ButtonControl, EndPointUrl, DocButton, SerialCard
 from screens.settings import SettingsBox, ApiKeyTxtbox
+from screens.historiqueScr import HistoriqueBox
+from screens import theme as t
 
 # import services
 from services.postApi import get_api_keys, generate_new_api_key
 from services import pairing
+from services import historique
 from services.netSvc import get_network_ips
 from services.config import __version__, app_name
 
@@ -94,6 +97,9 @@ kv_file_path = os.path.join(base_path, 'main_layout.kv')
 
 ## Main App Class
 class OpenSmsApp(MDApp):
+    # Dégradé de la marque Kelaplus (bandeau du haut), voir screens/theme.py.
+    degrade_marque = ObjectProperty(None, allownone=True)
+
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -123,8 +129,10 @@ class OpenSmsApp(MDApp):
         }
 
     def build(self):
-        self.theme_cls.primary_palette = "Blue"
-        self.theme_cls.accent_palette = "Orange"
+        # Couleurs de Kelaplus : violet et magenta sur fond clair.
+        self.theme_cls.theme_style = "Light"
+        self.theme_cls.primary_palette = "Purple"
+        self.degrade_marque = t.degrade()
         return Builder.load_file(kv_file_path)
 
     ## App logics
@@ -226,6 +234,9 @@ class OpenSmsApp(MDApp):
         self.resp_thred.start()
         # Kelaplus : une demande de connexion de l'ordinateur s'affiche ici dès qu'elle arrive (l'application doit être ouverte).
         Clock.schedule_interval(self.verifier_jumelage, 1)
+        # Accueil : chiffres du jour et ordinateurs connectés, tenus à jour.
+        Clock.schedule_interval(self.rafraichir_accueil, 3)
+        Clock.schedule_once(self.rafraichir_accueil, 1)
         print("Init success...")
 
     def is_service_running(self):
@@ -291,19 +302,13 @@ class OpenSmsApp(MDApp):
                         if server_stat == "started":
                             if not self.api_started:
                                 self.api_started = True
-                                api_srv_lbl.text = f"API Server running on port: {self.req_template["port"]}"
-                                api_srv_btn.btn_icon = "stop"
-                                api_srv_btn.btn_txt = "Stop Server"
-                                api_srv_btn.md_bg_color = "orange"
+                                Clock.schedule_once(lambda dt: self.afficher_etat_serveur(True))
                                 Clock.schedule_once(lambda dt: self.update_api_details())
                                 #Clock.schedule_once(lambda dt: self.show_toast_msg("API Server Started"))
                         elif server_stat == "stopped":
                             if self.api_started:
                                 self.api_started = False
-                                api_srv_lbl.text = "API Server is not running"
-                                api_srv_btn.btn_icon = "play"
-                                api_srv_btn.btn_txt = "Start Server"
-                                api_srv_btn.md_bg_color = "green"
+                                Clock.schedule_once(lambda dt: self.afficher_etat_serveur(False))
                                 Clock.schedule_once(lambda dt: self.clear_api_details())
                                 #Clock.schedule_once(lambda dt: self.show_toast_msg("API Server Stopped"))
 
@@ -313,17 +318,79 @@ class OpenSmsApp(MDApp):
                             provider = resp.get("provider", "unknown")
                             if not self.serial_started:
                                 if ser_stat == "ok":
-                                    stat_text = f"Modem connected to: {provider}"
+                                    stat_text = f"Modem connecté au réseau : {provider}"
                                     serial_stat_lbl.text = stat_text
-                                    serial_btn.btn_txt = "All Done"
-                                    serial_btn.md_bg_color = "orange"
+                                    serial_btn.btn_txt = "Modem connecté"
+                                    serial_btn.md_bg_color = t.VERT
                     else:
-                        api_srv_lbl.text = "Unable to get response from service"
+                        api_srv_lbl.text = "Le service du téléphone ne répond pas encore, patientez…"
                 except Exception as e:
                     print(f"Error while reading resp: {e}")
             else:
-                api_srv_lbl.text = "RESP Path doesn't exist!"
+                api_srv_lbl.text = "Démarrage du service du téléphone…"
             time.sleep(2)
+
+    def afficher_etat_serveur(self, en_marche: bool):
+        """ La carte « Passerelle SMS » de l'accueil : pastille, phrase et bouton selon l'état du serveur. """
+        ids = self.root.ids.home_scr.ids
+        if en_marche:
+            ids.etat_pastille.text = "En marche"
+            ids.etat_pastille.couleur = t.VERT
+            ids.etat_pastille.fond = t.VERT_PALE
+            ids.api_srv_lbl.text = "Le téléphone est prêt : Kelaplus peut envoyer ses SMS par ce téléphone."
+            ids.api_srv_btn.btn_icon = "stop"
+            ids.api_srv_btn.btn_txt = "Arrêter le serveur"
+            ids.api_srv_btn.md_bg_color = t.ROUGE
+        else:
+            ids.etat_pastille.text = "Arrêtée"
+            ids.etat_pastille.couleur = t.ROUGE
+            ids.etat_pastille.fond = t.ROUGE_PALE
+            ids.api_srv_lbl.text = "Le serveur est arrêté : Kelaplus ne peut pas envoyer de SMS par ce téléphone."
+            ids.api_srv_btn.btn_icon = "play"
+            ids.api_srv_btn.btn_txt = "Démarrer le serveur"
+            ids.api_srv_btn.md_bg_color = t.VIOLET
+
+    def rafraichir_accueil(self, dt=None):
+        """ Chiffres des SMS (aujourd'hui, envoyés, échecs) et ordinateurs Kelaplus connectés. """
+        try:
+            ids = self.root.ids.home_scr.ids
+            r = historique.resume()
+            ids.chiffre_jour.valeur = str(r["aujourdhui"])
+            ids.chiffre_envoyes.valeur = str(r["envoyes"])
+            ids.chiffre_echecs.valeur = str(r["echecs"])
+            postes = pairing.ordinateurs_connectes()
+            ids.ordinateurs_lbl.text = (
+                "\n".join(f"•  {p}" for p in postes)
+                if postes
+                else "Aucun ordinateur connecté. Dans Kelaplus : Communication ▸ Passerelles SMS ▸ Rechercher mon téléphone."
+            )
+        except Exception as e:
+            print(f"Accueil : rafraîchissement impossible : {e}")
+
+    def vider_historique(self, instance=None):
+        buttons = MDDialogButtonContainer(
+            Widget(),
+            MDButton(MDButtonText(text="Annuler"), style="text", on_release=self.txt_dialog_closer),
+            MDButton(
+                MDButtonText(text="Vider", theme_text_color="Custom", text_color=t.ROUGE),
+                style="text",
+                on_release=self.confirmer_vider_historique,
+            ),
+            spacing="8dp",
+        )
+        self.show_text_dialog("Vider l'historique ?", "Tous les SMS de la liste seront effacés de ce téléphone (pas des téléphones des parents).", None, buttons)
+
+    def confirmer_vider_historique(self, instance=None):
+        self.txt_dialog_closer()
+        try:
+            historique.vider()
+            self.root.ids.hist_scr._signature = None
+            self.root.ids.hist_scr.actualiser()
+            self.rafraichir_accueil()
+            self.show_toast_msg("Historique vidé.")
+        except Exception as e:
+            print(f"Historique : impossible de vider : {e}")
+            self.show_toast_msg("Impossible de vider l'historique.", is_error=True)
 
     def write_app_conf(self):
         with open(self.app_config, "w") as cf:
@@ -342,20 +409,14 @@ class OpenSmsApp(MDApp):
         ip_map = get_network_ips()
         port_no = self.config_template["port"]
         endpoint_box = self.root.ids.home_scr.ids.endpoint_box
-        doc_btn = DocButton()
-        endpoint_box.add_widget(doc_btn)
-        iface_widget = EndPointUrl()
-        iface_widget.url = f"http://127.0.0.1:{port_no}/sms"
-        iface_widget.iface_name = "localhost"
-        endpoint_box.add_widget(iface_widget)
         # WiFi interfaces
         for wifi_iface in ip_map["wifi"]:
             iface_name = wifi_iface.get("interface", "")
             ip_addr = wifi_iface["ip"]
             url = f"http://{ip_addr}:{port_no}/sms"
             iface_widget = EndPointUrl()
-            iface_widget.url = url
-            iface_widget.iface_name = f"WiFi: {iface_name}"
+            iface_widget.url = f"{ip_addr}:{port_no}"
+            iface_widget.iface_name = f"Wi-Fi ({iface_name})" if iface_name else "Wi-Fi"
             endpoint_box.add_widget(iface_widget)
         # Ethernet interfaces
         for eth_iface in ip_map["ethernet"]:
@@ -363,8 +424,8 @@ class OpenSmsApp(MDApp):
             ip_addr = eth_iface["ip"]
             url = f"http://{ip_addr}:{port_no}/sms"
             iface_widget = EndPointUrl()
-            iface_widget.url = url
-            iface_widget.iface_name = f"Eth: {iface_name}"
+            iface_widget.url = f"{ip_addr}:{port_no}"
+            iface_widget.iface_name = f"Câble réseau ({iface_name})" if iface_name else "Câble réseau"
             endpoint_box.add_widget(iface_widget)
 
     def api_server_mgr(self, instance=None):
@@ -421,25 +482,25 @@ class OpenSmsApp(MDApp):
             Widget(),
             MDButton(
                 MDButtonText(
-                    text="Cancel"
+                    text="Annuler"
                 ),
                 style="text",
                 on_release=self.txt_dialog_closer
             ),
             MDButton(
                 MDButtonText(
-                    text="Already granted",
+                    text="Déjà accordée",
                     theme_text_color= "Custom",
-                    text_color= "orange"
+                    text_color= t.GRIS
                 ),
                 style="text",
                 on_release=self.confirm_android_permissions
             ),
             MDButton(
                 MDButtonText(
-                    text="Open Settings",
+                    text="Ouvrir les paramètres",
                     theme_text_color= "Custom",
-                    text_color= "green"
+                    text_color= t.VIOLET
                 ),
                 style="text",
                 on_release=self.open_android_settings
@@ -447,8 +508,8 @@ class OpenSmsApp(MDApp):
             spacing="8dp",
         )
         self.show_text_dialog(
-            "Permissions Missing",
-            "You need to grant the SMS & Notifications permissions from Settings.",
+            "Permissions manquantes",
+            "Accordez les permissions SMS et Notifications dans les paramètres du téléphone (si Android les bloque : menu ⋮ ▸ « Autoriser les paramètres restreints »).",
             None,
             buttons
         )
@@ -485,16 +546,16 @@ class OpenSmsApp(MDApp):
             Widget(),
             MDButton(
                 MDButtonText(
-                    text="Cancel"
+                    text="Annuler"
                 ),
                 style="text",
                 on_release=self.txt_dialog_closer
             ),
             MDButton(
                 MDButtonText(
-                    text="Generate",
+                    text="Générer",
                     theme_text_color= "Custom",
-                    text_color= "green"
+                    text_color= t.VIOLET
                 ),
                 style="text",
                 on_release=self.create_new_api_key
@@ -502,8 +563,8 @@ class OpenSmsApp(MDApp):
             spacing="8dp",
         )
         self.show_text_dialog(
-            "Generate API Key",
-            "Do you want to generate the a new API key? This will make old keys invalid.",
+            "Générer une clé API",
+            "Générer une nouvelle clé API ? Les anciennes clés, et les ordinateurs Kelaplus déjà connectés, ne fonctionneront plus : il faudra les reconnecter.",
             None,
             buttons
         )
@@ -522,16 +583,16 @@ class OpenSmsApp(MDApp):
                 Widget(),
                 MDButton(
                     MDButtonText(
-                        text="Cancel"
+                        text="Annuler"
                     ),
                     style="text",
                     on_release=self.txt_dialog_closer
                 ),
                 MDButton(
                     MDButtonText(
-                        text="Copy",
+                        text="Copier",
                         theme_text_color= "Custom",
-                        text_color= "green"
+                        text_color= t.VIOLET
                     ),
                     style="text",
                     on_release=self.copy_api_key
@@ -539,19 +600,19 @@ class OpenSmsApp(MDApp):
                 spacing="8dp",
             )
             self.show_text_dialog(
-                "Your New API Key",
-                "The key is already copied, you can paste anywhere. This screen appears only once, make sure you copy the key securely!",
+                "Votre nouvelle clé API",
+                "La clé est déjà copiée. Cet écran ne s'affiche qu'une fois : gardez-la en lieu sûr.",
                 custom,
                 buttons
             )
         else:
-            Clock.schedule_once(lambda dt: self.show_toast_msg("Failed to generate API key, try again!", is_error=True))
+            Clock.schedule_once(lambda dt: self.show_toast_msg("La clé n'a pas pu être créée, réessayez.", is_error=True))
 
     def copy_api_key(self, instance=None):
         if self.api_key:
             Clipboard.copy(self.api_key)
         self.txt_dialog_closer()
-        Clock.schedule_once(lambda dt: self.show_toast_msg("API Key has been copied, store it securely."))
+        Clock.schedule_once(lambda dt: self.show_toast_msg("Clé API copiée : gardez-la en lieu sûr."))
 
     ## Connexion de Kelaplus (jumelage) : l'ordinateur demande, l'utilisateur autorise sur le téléphone
 
@@ -580,7 +641,7 @@ class OpenSmsApp(MDApp):
                 on_release=lambda *_: self.repondre_jumelage(demande["id"], False)
             ),
             MDButton(
-                MDButtonText(text="Autoriser", theme_text_color="Custom", text_color="green"),
+                MDButtonText(text="Autoriser", theme_text_color="Custom", text_color=t.VIOLET),
                 style="text",
                 on_release=lambda *_: self.repondre_jumelage(demande["id"], True)
             ),
@@ -638,11 +699,11 @@ class OpenSmsApp(MDApp):
 
     def start_serial_connection(self, instance=None):
         if self.serial_started:
-            self.show_toast_msg("Modem is already connected")
+            self.show_toast_msg("Le modem est déjà connecté.")
             return
         port = self.req_template["serial_port"]
         if port == "none":
-            self.show_toast_msg("Please select the Serial Port first!", is_error=True)
+            self.show_toast_msg("Choisissez d'abord le port série.", is_error=True)
             return
         baud_rate = self.root.ids.home_scr.ids.baud_rate.text
         baud_int = self.req_template["baudrate"]
@@ -672,7 +733,7 @@ class OpenSmsApp(MDApp):
                 self.req_template["port"] = port_no
         print(f"Service on start: {self.config_template["boot"]}, port: {self.config_template["port"]}")
         Thread(target=self.write_app_conf, daemon=True).start()
-        Clock.schedule_once(lambda dt: self.show_toast_msg("Settings has been saved."))
+        Clock.schedule_once(lambda dt: self.show_toast_msg("Réglages enregistrés."))
 
     def refresh_settings_view(self):
         auto_start_sw = self.root.ids.settings_scr.ids.auto_start_sw
@@ -686,13 +747,13 @@ class OpenSmsApp(MDApp):
     def reset_settings(self, instance=None):
         self.config_template = {
             "port": 9292,
-            "boot": False,
+            "boot": True,
         }
         self.req_template["port"] = 9292
-        print("Settings reset has been done!")
+        print("Réglages remis à zéro.")
         self.refresh_settings_view()
         Thread(target=self.write_app_conf, daemon=True).start()
-        Clock.schedule_once(lambda dt: self.show_toast_msg("Settings reset has been done!"))
+        Clock.schedule_once(lambda dt: self.show_toast_msg("Réglages remis à zéro."))
 
     ## App or UI related things
     def acquire_wakelock(self):
@@ -721,7 +782,8 @@ class OpenSmsApp(MDApp):
 
     def show_toast_msg(self, message, is_error=False, duration=3):
         from kivymd.uix.snackbar import MDSnackbar, MDSnackbarText, MDSnackbarSupportingText
-        bg_color = (0.2, 0.6, 0.2, 1) if not is_error else (0.8, 0.2, 0.2, 1)
+        # Couleurs de Kelaplus : violet pour une information, rouge pour une erreur.
+        bg_color = (0.576, 0.02, 0.827, 1) if not is_error else (0.863, 0.149, 0.149, 1)
         MDSnackbar(
             MDSnackbarText(
                 text=message,
@@ -757,11 +819,11 @@ class OpenSmsApp(MDApp):
 
     def goto_app_settings(self, instance=None):
         self.txt_dialog_closer()
-        self.go_to_screen("Settings")
+        self.go_to_screen("Réglages")
 
     def goto_logs_screen(self, instance=None):
         self.root.ids.nav_drawer.set_state("close")
-        self.go_to_screen("Logs")
+        self.go_to_screen("Journal")
 
     def go_to_screen(self, screen:str):
         self.root.ids.screen_manager.current = screen
@@ -775,8 +837,8 @@ class OpenSmsApp(MDApp):
         self.root.ids.top_back_btn.disabled = False
 
     def back_button_action(self, instance=None):
-        if self.root.ids.screen_manager.current in ["Settings", "Logs"]:
-           self.go_to_screen("SMS")
+        if self.root.ids.screen_manager.current in ["Réglages", "Journal", "Historique"]:
+           self.go_to_screen("Accueil")
 
     def events(self, instance, keyboard, keycode, text, modifiers):
         """Handle mobile device button presses (e.g., Android back button)."""

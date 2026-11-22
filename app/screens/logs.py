@@ -32,7 +32,7 @@ Builder.load_string('''
                 id: log_container
                 adaptive_height: True
                 valign: "top"
-                text: "No logs yet!"
+                text: "Aucune ligne dans le journal pour l'instant."
                 font_style: "Label"
                 role: "small"
 
@@ -44,15 +44,15 @@ class LogBox(MDBoxLayout):
         super().__init__(**kwargs)
         self.app_name = app_name
         self.top_menu_items = {
-            "Refresh": {
+            "Actualiser": {
                 "icon": "refresh",
                 "action": "refresh",
             },
-            "Copy Logs": {
+            "Copier le journal": {
                 "icon": "content-copy",
                 "action": "copy-logs",
             },
-            "Clear Logs": {
+            "Vider le journal": {
                 "icon": "broom",
                 "action": "clear-logs",
             }

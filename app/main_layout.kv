@@ -2,6 +2,8 @@
 #:import AppHomeBox screens.mainScr.AppHomeBox
 #:import SettingsBox screens.settings.SettingsBox
 #:import LogBox screens.logs.LogBox
+#:import HistoriqueBox screens.historiqueScr.HistoriqueBox
+#:import t screens.theme
 
 <BaseMDNavigationItem>
     MDNavigationItemIcon:
@@ -10,42 +12,77 @@
         text: root.text
 
 MDScreen:
-    md_bg_color: self.theme_cls.backgroundColor
+    md_bg_color: t.FOND
 
     MainScreenBox: # main container
         id: main_scr_box
         orientation: 'vertical'
         padding: 0 , self.top_pad, 0, 0
-        #spacing: dp(4)
 
-        MDTopAppBar:
-            type: "small"
-            theme_bg_color: "Custom"
-            md_bg_color: '#0a3580'
-            pos_hint: {"top": 1}
+        # Bandeau aux couleurs de Kelaplus : dégradé indigo → violet → magenta, logo k+.
+        MDBoxLayout:
+            size_hint_y: None
+            height: dp(64)
+            padding: dp(6), 0, dp(12), 0
+            spacing: dp(6)
+            canvas.before:
+                Color:
+                    rgba: 1, 1, 1, 1
+                Rectangle:
+                    pos: self.pos
+                    size: self.size
+                    texture: app.degrade_marque
 
-            MDTopAppBarLeadingButtonContainer:
-                MDActionTopAppBarButton:
-                    icon: "menu"
-                    color: "white"
-                    on_release: nav_drawer.set_state("toggle")
-                MDActionTopAppBarButton:
-                    id: top_back_btn
-                    icon: "arrow-left"
-                    color: "white"
-                    opacity: 0
-                    disabled: True
-                    on_release: app.back_button_action()
-            MDTopAppBarTitle:
-                text: "Kelaplus SMS"
-                color: "white"
-            MDTopAppBarTrailingButtonContainer:
-                MDActionTopAppBarButton:
-                    id: right_dot_menu
-                    icon: "dots-vertical"
-                    color: "white"
-                    opacity: 0
-                    disabled: True
+            MDIconButton:
+                icon: "menu"
+                theme_icon_color: "Custom"
+                icon_color: "white"
+                pos_hint: {"center_y": .5}
+                on_release: nav_drawer.set_state("toggle")
+            MDIconButton:
+                id: top_back_btn
+                icon: "arrow-left"
+                theme_icon_color: "Custom"
+                icon_color: "white"
+                pos_hint: {"center_y": .5}
+                opacity: 0
+                disabled: True
+                size_hint_x: None
+                width: 0 if self.disabled else dp(48)
+                on_release: app.back_button_action()
+            Image:
+                source: "data/images/favicont512.png"
+                size_hint: None, None
+                size: dp(38), dp(38)
+                pos_hint: {"center_y": .5}
+            MDBoxLayout:
+                orientation: "vertical"
+                adaptive_height: True
+                pos_hint: {"center_y": .5}
+                padding: dp(6), 0, 0, 0
+                MDLabel:
+                    text: "Kelaplus SMS"
+                    font_style: "Title"
+                    role: "large"
+                    bold: True
+                    theme_text_color: "Custom"
+                    text_color: "white"
+                    adaptive_height: True
+                MDLabel:
+                    text: "Le téléphone SMS de l'école"
+                    font_style: "Label"
+                    role: "medium"
+                    theme_text_color: "Custom"
+                    text_color: 1, 1, 1, .85
+                    adaptive_height: True
+            MDIconButton:
+                id: right_dot_menu
+                icon: "dots-vertical"
+                theme_icon_color: "Custom"
+                icon_color: "white"
+                pos_hint: {"center_y": .5}
+                opacity: 0
+                disabled: True
 
         MDFloatLayout:
 
@@ -55,26 +92,34 @@ MDScreen:
                     id: screen_manager
 
                     MDScreen:
-                        name: "SMS"
+                        name: "Accueil"
                         on_enter: app.on_main_screen_entry()
                         AppHomeBox:
                             id: home_scr
-                            padding: 8, 2, 8, (main_scr_box.bottom_pad + btm_nav_bar.height + 2)
+                            padding: dp(12), 0, dp(12), (main_scr_box.bottom_pad + btm_nav_bar.height + 2)
 
                     MDScreen:
-                        name: "Settings"
+                        name: "Historique"
+                        on_enter: hist_scr.a_l_ouverture()
+                        on_leave: hist_scr.a_la_sortie()
+                        HistoriqueBox:
+                            id: hist_scr
+                            padding: dp(12), 0, dp(12), (main_scr_box.bottom_pad + btm_nav_bar.height + 2)
+
+                    MDScreen:
+                        name: "Réglages"
                         on_enter: app.on_settings_entry()
                         SettingsBox:
                             id: settings_scr
-                            padding: 8, 2, 8, (main_scr_box.bottom_pad + btm_nav_bar.height + 2)
+                            padding: dp(12), dp(12), dp(12), (main_scr_box.bottom_pad + btm_nav_bar.height + 2)
 
                     MDScreen:
-                        name: "Logs"
+                        name: "Journal"
                         on_enter: log_scr.log_show(right_dot_menu, top_back_btn)
                         on_leave: log_scr.on_log_scr_exit(right_dot_menu)
                         LogBox:
                             id: log_scr
-                            padding: 8, 2, 8, (main_scr_box.bottom_pad + btm_nav_bar.height + 2)
+                            padding: dp(12), dp(8), dp(12), (main_scr_box.bottom_pad + btm_nav_bar.height + 2)
 
                 MDNavigationDrawer:
                     id: nav_drawer
@@ -82,15 +127,13 @@ MDScreen:
 
                     MDNavigationDrawerMenu:
                         MDNavigationDrawerLabel:
-                            text: "Operations"
+                            text: "Kelaplus SMS"
                         MDNavigationDrawerItem:
                             on_release: app.goto_logs_screen()
                             MDNavigationDrawerItemLeadingIcon:
-                                icon: "file"
+                                icon: "text-box-outline"
                             MDNavigationDrawerItemText:
-                                text: "Logs"
-                            #MDNavigationDrawerItemTrailingText:
-                            #    text: "24"
+                                text: "Journal technique"
                         MDNavigationDrawerDivider:
 
             MDNavigationBar:
@@ -99,11 +142,14 @@ MDScreen:
                 on_switch_tabs: app.on_switch_tabs(*args)
 
                 BaseMDNavigationItem
-                    icon: "api"
-                    text: "SMS"
+                    icon: "home-variant-outline"
+                    text: "Accueil"
                     active: True
 
                 BaseMDNavigationItem
-                    icon: "wrench"
-                    text: "Settings"
+                    icon: "message-text-clock-outline"
+                    text: "Historique"
 
+                BaseMDNavigationItem
+                    icon: "cog-outline"
+                    text: "Réglages"

@@ -18,6 +18,7 @@ from services.smsApi import SmsCrossPlatform, clean_and_validate_phone
 from services.logSvc import LogService
 from services.config import app_name, __version__ as app_version
 from services import pairing
+from services import historique
 
 # OS specific
 #try:
@@ -263,6 +264,11 @@ async def process_sms_req(
         )
 
     stat = sms_api.send_sms(valid_phone, item.text)
+    # Kelaplus : chaque envoi est gardé dans l'historique du téléphone (onglet « Historique »).
+    try:
+        historique.ajouter(valid_phone, item.text, bool(stat), (client or {}).get("name", ""))
+    except Exception as e:
+        print(f"Historique non enregistré : {e}")
     if stat:
         print(f"SMS dispatched to: {valid_phone}")
         log_activities(f"SMS dispatched to: {valid_phone}")
