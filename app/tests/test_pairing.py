@@ -20,9 +20,12 @@ class JumelageTest(unittest.TestCase):
         self._avant = (pairing.fichier_demande, pairing.fichier_cles)
         pairing.fichier_demande = join(self.dossier.name, "pair_request.json")
         pairing.fichier_cles = join(self.dossier.name, "keys.json")
+        self._identite = pairing.fichier_identite
+        pairing.fichier_identite = join(self.dossier.name, "telephone_id.json")
 
     def tearDown(self):
         pairing.fichier_demande, pairing.fichier_cles = self._avant
+        pairing.fichier_identite = self._identite
         self.dossier.cleanup()
 
     def test_autorisation_complete(self):
@@ -77,6 +80,13 @@ class JumelageTest(unittest.TestCase):
         a = pairing.creer_demande("PC")
         b = pairing.creer_demande("PC")
         self.assertEqual(a["id"], b["id"])
+
+
+class IdentiteTest(JumelageTest):
+    def test_identite_stable(self):
+        a = pairing.identifiant()
+        self.assertEqual(len(a), 32)
+        self.assertEqual(pairing.identifiant(), a)  # la même à chaque ouverture
 
 
 if __name__ == "__main__":

@@ -38,6 +38,7 @@ config_dir = join(base_path, "config")
 os.makedirs(config_dir, exist_ok=True)
 fichier_demande = join(config_dir, "pair_request.json")
 fichier_cles = join(config_dir, "keys.json")
+fichier_identite = join(config_dir, "telephone_id.json")
 
 
 def _hacher(cle: str) -> str:
@@ -58,6 +59,16 @@ def _ecrire(chemin: str, donnees) -> None:
     with open(temporaire, "w", encoding="utf-8") as f:
         json.dump(donnees, f)
     os.replace(temporaire, chemin)
+
+
+def identifiant() -> str:
+    """ Identité stable de ce téléphone (créée une fois) : Kelaplus le retrouve grâce à elle quand son adresse sur le Wi-Fi change. """
+    donnees = _lire(fichier_identite, {})
+    ident = donnees.get("id") if isinstance(donnees, dict) else None
+    if not ident:
+        ident = uuid.uuid4().hex
+        _ecrire(fichier_identite, {"id": ident, "cree": time.time()})
+    return ident
 
 
 def nom_appareil() -> str:

@@ -314,6 +314,8 @@ async def kelaplus_ping():
     return {
         "service": "kelaplus-sms",
         "version": app_version,
+        # Identité stable : Kelaplus retrouve ce téléphone même si sa box lui donne une autre adresse.
+        "id": pairing.identifiant(),
         "appareil": pairing.nom_appareil(),
         "ordinateurs": len(pairing.ordinateurs_connectes()),
         # Solde de SMS de chaque SIM (opérateur ou estimation) : Kelaplus l'affiche à côté du téléphone.
